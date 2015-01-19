@@ -482,7 +482,7 @@ wait_for(Check={M,F,A}, Seconds) when Seconds > 0 ->
 
 %% @private
 %%
-%% @doc 
+%% @doc Create an index and bucket type to hold errors encountered in the index function
 maybe_setup_error_index(true) ->
     ok;
 maybe_setup_error_index(false) ->
@@ -502,13 +502,19 @@ maybe_setup_error_index(false) ->
 
 %% @private
 %%
-%% @doc 
+%% @doc There are certain types of errors in Solr that cannot set _yz_err = 1 on the original index 
+%%      because Solr cannot index the document. This function will store the encountered error message
+%%      in a bucket type called "yz_err", the bucket and key will be the <original bucket type>.<original bucket>, 
+%%      and the key will be the original key. This funciton is called from catch clause index/3.
+store_solr_error({{?YZ_ERROR_INDEX,_},_}=BKey, Err) ->
+    lager:debug("YZ_ERR_PATCH: Error encountered in yz_kv:index, first submission to error index failed. Preventing recursion by exiting, BKey = ~p, Err = ~p", [BKey, Err]),
+    ok;
 store_solr_error(BKey, Err) ->
     try
         %% Todo: make this behavior configurable
         maybe_setup_error_index(yz_index:exists(?YZ_ERROR_INDEX)),
 
-        lager:info("YZ_ERR_PATCH: Error encountered in yz_kv:index, submitting to yz_err index, BKey = ~p, Err = ~p", [BKey, Err]),
+        lager:debug("YZ_ERR_PATCH: Error encountered in yz_kv:index, submitting to yz_err index, BKey = ~p, Err = ~p", [BKey, Err]),
 
         ErrStr = list_to_binary(lists:flatten(io_lib:format("~p",[Err]))),
         {{OrigType, OrigBucket}, OrigKey} = BKey,
@@ -519,7 +525,7 @@ store_solr_error(BKey, Err) ->
             {"_yz_err_rb_s", OrigBucket}
         ])),
 
-        lager:info("YZ_ERR_PATCH: Attempting to write this obj to Riak, Value: ~p", [Value]),
+        lager:debug("YZ_ERR_PATCH: Attempting to write this obj to Riak, Value: ~p", [Value]),
 
         Client = client(),
         Bucket = <<OrigType/binary, <<".">>/binary, OrigBucket/binary>>,
@@ -529,7 +535,7 @@ store_solr_error(BKey, Err) ->
 
         put(Client, TypedBucket, Key, Value, ContentType),
 
-        lager:info("YZ_ERR_PATCH: Submission to yz_err index complete")
+        lager:debug("YZ_ERR_PATCH: Submission to yz_err index complete")
     catch _:E ->
         Trace = erlang:get_stacktrace(),
         ?ERROR("failed to index object ~p with error ~p because ~p",
