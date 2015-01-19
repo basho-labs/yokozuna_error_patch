@@ -306,6 +306,10 @@
 -define(YZ_DEFAULT_SCHEMA_NAME, <<"_yz_default">>).
 -define(YZ_SCHEMA_BUCKET, <<"_yz_schema">>).
 
+%% BEGIN YZ_ERR_PATCH Code
+-define(YZ_ERROR_INDEX, <<"yz_err">>).
+%% END YZ_ERR_PATCH Code
+
 -type raw_schema() :: binary().
 %% xmerl does not export these types,
 %% so we just define them to be equal

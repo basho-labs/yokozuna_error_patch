@@ -212,40 +212,9 @@ index(Obj, Reason, P) ->
                                     ?ERROR("failed to delete docid ~p with error ~p because ~p",
                                            [BKey, Err, Trace]);
                                 _ ->
-
-                                    %% BEGIN YZ_ERR PATCH
-                                    %% Todo: make this behavior configurable
-                                    case Err of
-                                        {_Reason,{ok,_Code,[{"Content-Type",_ContentType},{"Transfer-Encoding",_TransferEncoding}],SolrJsonReason}} ->
-                                            %% _Reason = "Failed to index docs"
-                                            %% _Code = "400"
-                                            %% _ContentType = "application/json; charset=UTF-8"
-                                            %% _TransferEncoding = "chunked"
-                                            %% SolrJsonReason = <<"{\"responseHeader\":{\"status\":400,\"QTime\":35},\"error\":{\"msg\":\"Invalid Date String:'blahblahblah'\",\"code\":400}}\n">> 
-                                            case mochijson2:decode(SolrJsonReason) of
-                                                {struct,[_,{<<"error">>,{struct,[{<<"msg">>,SolrBinReason},_]}}]} ->
-                                                    lager:info("YZ_ERR Error encountered in yz_kv:index, submitting to yz_err index, BKey = ~p, Err = ~p", [BKey, Err]),
-                                                    Client = client(),
-                                                    {{OrigType, OrigBucket}, OrigKey} = BKey,
-                                                    Bucket = {<<"yz_err">>, <<"all_errors">>},
-                                                    Key = riak_core_util:unique_id_62(),
-                                                    Value = list_to_binary(mochijson2:encode([
-                                                        {"_yz_err_msg", SolrBinReason},
-                                                        {"_yz_err_rk", OrigKey},
-                                                        {"_yz_err_rt", OrigType},
-                                                        {"_yz_err_rb", OrigBucket}
-                                                    ])),
-                                                    ContentType = "application/json",
-                                                    lager:info("YZ_ERR Error attempting to write this obj to Riak, Value: ~p", [Value]),
-
-                                                    put(Client, Bucket, Key, Value, ContentType),
-                                                    lager:info("YZ_ERR Error submission to yz_err index complete");
-                                                _ -> ok
-                                            end;
-                                        _ -> ok
-                                    end,
-                                    %% END YZ_ERR PATCH
-
+                                    %% BEGIN YZ_ERR_PATCH Code
+                                    store_solr_error(BKey, Err),
+                                    %% END YZ_ERR_PATCH Code
                                     ?ERROR("failed to index object ~p with error ~p because ~p",
                                            [BKey, Err, Trace])
                             end
@@ -494,3 +463,76 @@ is_owner_or_future_owner(P, Node, Ring) ->
 -spec is_service_up(atom(), node()) -> boolean().
 is_service_up(Service, Node) ->
     lists:member(Service, riak_core_node_watcher:services(Node)).
+
+%% BEGIN YZ_ERR_PATCH Code
+%% @private
+%%
+%% @doc Wait for `Check' for the given number of `Seconds'.
+wait_for(_, 0) ->
+    ok;
+wait_for(Check={M,F,A}, Seconds) when Seconds > 0 ->
+    case M:F(A) of
+        true ->
+            ok;
+        false ->
+            lager:debug("Waiting for ~p:~p(~p)...~n", [M, F, A]),
+            timer:sleep(1000),
+            wait_for(Check, Seconds - 1)
+    end.
+
+%% @private
+%%
+%% @doc 
+maybe_setup_error_index(true) ->
+    ok;
+maybe_setup_error_index(false) ->
+    lager:info("YZ_ERR_PATCH: Creating error index = ~p", [?YZ_ERROR_INDEX]),
+
+    yz_index:create(?YZ_ERROR_INDEX, ?YZ_DEFAULT_SCHEMA_NAME),
+
+    wait_for({yz_solr, ping, [?YZ_ERROR_INDEX]}, 10),
+
+    case riak_core_bucket_type:get(?YZ_ERROR_INDEX) of
+        undefined ->
+            riak_core_bucket_type:create(?YZ_ERROR_INDEX, [{allow_mult, false},{?YZ_INDEX, ?YZ_ERROR_INDEX}]),
+            riak_core_bucket_type:activate(?YZ_ERROR_INDEX);
+        _ ->
+            riak_core_bucket_type:update(?YZ_ERROR_INDEX, [{allow_mult, false},{?YZ_INDEX, ?YZ_ERROR_INDEX}])
+    end.
+
+%% @private
+%%
+%% @doc 
+store_solr_error(BKey, Err) ->
+    try
+        %% Todo: make this behavior configurable
+        maybe_setup_error_index(yz_index:exists(?YZ_ERROR_INDEX)),
+
+        lager:info("YZ_ERR_PATCH: Error encountered in yz_kv:index, submitting to yz_err index, BKey = ~p, Err = ~p", [BKey, Err]),
+
+        ErrStr = list_to_binary(lists:flatten(io_lib:format("~p",[Err]))),
+        {{OrigType, OrigBucket}, OrigKey} = BKey,
+        Value = list_to_binary(mochijson2:encode([
+            {"_yz_err_msg_s", ErrStr},
+            {"_yz_err_rk_s", OrigKey},
+            {"_yz_err_rt_s", OrigType},
+            {"_yz_err_rb_s", OrigBucket}
+        ])),
+
+        lager:info("YZ_ERR_PATCH: Attempting to write this obj to Riak, Value: ~p", [Value]),
+
+        Client = client(),
+        Bucket = <<OrigType/binary, <<".">>/binary, OrigBucket/binary>>,
+        TypedBucket = {?YZ_ERROR_INDEX, Bucket},
+        Key = OrigKey,
+        ContentType = "application/json",
+
+        put(Client, TypedBucket, Key, Value, ContentType),
+
+        lager:info("YZ_ERR_PATCH: Submission to yz_err index complete")
+    catch _:E ->
+        Trace = erlang:get_stacktrace(),
+        ?ERROR("failed to index object ~p with error ~p because ~p",
+                                           [BKey, E, Trace])
+    end.
+%% END YZ_ERR_PATCH Code
