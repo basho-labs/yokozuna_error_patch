@@ -39,3 +39,11 @@ Following is an example record returned from the query `curl 'http://localhost:8
     "_yz_rt": "yz_err"
 }
 ```
+
+## yz_err bucket type creation
+
+The `yz_err` bucket type and index will be automatically created upon the first execution of the error code. This means that the first error that triggers this code flow can take 15-20+ seconds. To manually trigger this creation, run `riak attach` and run the following erlang snippet:
+
+```
+yz_kv:maybe_setup_error_index(yz_index:exists(<<"yz_err")).
+```
