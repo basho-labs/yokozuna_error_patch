@@ -2,7 +2,7 @@ REBAR ?= $(shell pwd)/rebar
 
 .PHONY: deps rel
 
-all: deps
+all: deps compile
 
 compile:
 	$(REBAR) compile
