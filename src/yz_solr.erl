@@ -203,7 +203,7 @@ index(Core, Docs, DelOps) ->
             lager:info("YZ_ERR Error encountered in yz_solr:index, submitting to yz_err index, JSON = ~p", [JSON]),
             Client = yz_kv:client(),
             Bucket = {<<"yz_err">>, <<"all_errors">>},
-            Key = <<"my_key">>,
+            Key = riak_core_util:unique_id_62(),
             Value = mochijson2:encode([
                 {"_yz_err_msg", Err},
                 {"_yz_err_rk", "somekey"},
