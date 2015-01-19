@@ -1,0 +1,15 @@
+%% -*- erlang -*-
+{application, yokozuna,
+ [
+  {description, "Integrating Apache Solr into Riak"},
+  {vsn, git},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  ibrowse,
+                  riak_core,
+                  riak_kv
+                 ]},
+  {env, []}
+ ]}.
