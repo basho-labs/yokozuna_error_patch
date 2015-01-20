@@ -213,9 +213,7 @@ index(Obj, Reason, P) ->
                                            [BKey, Err, Trace]);
                                 _ ->
                                     %% BEGIN YZ_ERR_PATCH Code
-                                    spawn(fun() ->
-                                        store_solr_error(BKey, Err)
-                                    end),
+                                    yz_errors:store_solr_error(BKey, Err),
                                     %% END YZ_ERR_PATCH Code
                                     ?ERROR("failed to index object ~p with error ~p because ~p",
                                            [BKey, Err, Trace])
@@ -465,92 +463,3 @@ is_owner_or_future_owner(P, Node, Ring) ->
 -spec is_service_up(atom(), node()) -> boolean().
 is_service_up(Service, Node) ->
     lists:member(Service, riak_core_node_watcher:services(Node)).
-
-%% BEGIN YZ_ERR_PATCH Code
-%% @private
-%%
-%% @doc Wait for `Check' for the given number of `Seconds'.
-wait_for(_, 0) ->
-    ok;
-wait_for(Check={M,F,A}, Seconds) when Seconds > 0 ->
-    case M:F(A) of
-        true ->
-            ok;
-        false ->
-            lager:debug("Waiting for ~p:~p(~p)...~n", [M, F, A]),
-            timer:sleep(1000),
-            wait_for(Check, Seconds - 1)
-    end.
-
-%% @private
-%%
-%% @doc Create bucket type to hold errors encountered in index/3
-maybe_setup_error_bucket_type(undefined) ->
-    lager:info("YZ_ERR_PATCH: Creating error bucket type = ~p", [?YZ_ERROR_INDEX]),
-    riak_core_bucket_type:create(?YZ_ERROR_INDEX, [{allow_mult, false},{?YZ_INDEX, ?YZ_ERROR_INDEX}]),
-    riak_core_bucket_type:activate(?YZ_ERROR_INDEX);
-maybe_setup_error_bucket_type(_) ->
-    lager:info("YZ_ERR_PATCH: Creating error bucket type = ~p", [?YZ_ERROR_INDEX]),
-    riak_core_bucket_type:update(?YZ_ERROR_INDEX, [{allow_mult, false},{?YZ_INDEX, ?YZ_ERROR_INDEX}]).
-
-%% @private
-%%
-%% @doc Create an index to hold errors encountered in index/3
-maybe_setup_error_index(true) ->
-    ok;
-maybe_setup_error_index(false) ->
-    lager:info("YZ_ERR_PATCH: Creating error index = ~p", [?YZ_ERROR_INDEX]),
-
-    yz_index:create(?YZ_ERROR_INDEX, ?YZ_DEFAULT_SCHEMA_NAME),
-
-    wait_for({yz_solr, ping, [?YZ_ERROR_INDEX]}, 10).
-
-%% @private
-%%
-%% @doc Create an index and bucket type to hold errors encountered in index/3
-setup_error_bucket() ->
-    ok = maybe_setup_error_index(yz_index:exists(?YZ_ERROR_INDEX)),
-    Type = riak_core_bucket_type:get(?YZ_ERROR_INDEX),
-    ok = maybe_setup_error_bucket_type(Type),
-    ok.
-
-%% @private
-%%
-%% @doc There are certain types of errors in Solr that cannot set _yz_err = 1 on the original index 
-%%      because Solr cannot index the document. This function will store the encountered error message
-%%      in a bucket type called "yz_err", the bucket and key will be the <original bucket type>.<original bucket>, 
-%%      and the key will be the original key. This funciton is called from catch clause index/3.
-store_solr_error({{?YZ_ERROR_INDEX,_},_}=BKey, Err) ->
-    lager:debug("YZ_ERR_PATCH: Error encountered in yz_kv:index, first submission to error index failed. Preventing recursion by exiting, BKey = ~p, Err = ~p", [BKey, Err]),
-    ok;
-store_solr_error(BKey, Err) ->
-    try
-        %% Todo: make this behavior configurable
-        lager:debug("YZ_ERR_PATCH: Error encountered in yz_kv:index, submitting to yz_err index, BKey = ~p, Err = ~p", [BKey, Err]),
-
-        ErrStr = list_to_binary(lists:flatten(io_lib:format("~p",[Err]))),
-        {{OrigType, OrigBucket}, OrigKey} = BKey,
-        Value = list_to_binary(mochijson2:encode([
-            {"_yz_err_msg_s", ErrStr},
-            {"_yz_err_rk_s", OrigKey},
-            {"_yz_err_rt_s", OrigType},
-            {"_yz_err_rb_s", OrigBucket}
-        ])),
-
-        lager:debug("YZ_ERR_PATCH: Attempting to write this obj to Riak, Value: ~p", [Value]),
-
-        Client = client(),
-        Bucket = <<OrigType/binary, <<".">>/binary, OrigBucket/binary>>,
-        TypedBucket = {?YZ_ERROR_INDEX, Bucket},
-        Key = OrigKey,
-        ContentType = "application/json",
-
-        put(Client, TypedBucket, Key, Value, ContentType),
-
-        lager:debug("YZ_ERR_PATCH: Submission to yz_err index complete")
-    catch _:E ->
-        Trace = erlang:get_stacktrace(),
-        ?ERROR("failed to index object ~p with error ~p because ~p",
-                                           [BKey, E, Trace])
-    end.
-%% END YZ_ERR_PATCH Code

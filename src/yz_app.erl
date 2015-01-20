@@ -79,7 +79,7 @@ maybe_setup(true) ->
     ok = riak_core:register(yokozuna, [{bucket_validator, yz_bucket_validator}]),
     ok = riak_core:register(search, [{permissions, ['query',admin]}]),
     ok = yz_schema:setup_schema_bucket(),
-    ok = yz_kv:setup_error_bucket(),
+    ok = yz_errors:setup_error_bucket(),
     ok.
 
 %% @doc Conditionally register PB service IFF Riak Search is not
