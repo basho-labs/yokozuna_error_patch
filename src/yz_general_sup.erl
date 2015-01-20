@@ -58,10 +58,12 @@ init([]) ->
              {yz_cover, start_link, []},
              permanent, 5000, worker, [yz_cover]},
 
+    %% BEGIN YZ_ERR_PATCH Code
     Errors = {yz_errors,
              {yz_errors, start_link, []},
              permanent, 5000, worker, [yz_errors]},
 
     Children = [Events, HashtreeSup, EntropyMgr, Cover, Errors],
+    %% END YZ_ERR_PATCH Code
 
     {ok, {{one_for_one, 5, 10}, Children}}.
