@@ -7,10 +7,10 @@ Yokozuna modifications to improve error handling and visibility.
 make
 ```
 
-Copy the yz_kv.beam into the basho-patches directory. The basho-patches directory for your platform can be found here: [http://docs.basho.com/riak/latest/ops/running/rolling-upgrades/#Basho-Patches](http://docs.basho.com/riak/latest/ops/running/rolling-upgrades/#Basho-Patches)
+Copy the generated beams into the basho-patches directory. The basho-patches directory for your platform can be found here: [http://docs.basho.com/riak/latest/ops/running/rolling-upgrades/#Basho-Patches](http://docs.basho.com/riak/latest/ops/running/rolling-upgrades/#Basho-Patches)
 
 ```
-cp -R ebin/yz_kv.beam /usr/lib/riak/lib/basho-patches/yz_kv.beam
+cp -R ebin/*.beam /usr/lib/riak/lib/basho-patches/
 ```
 
 ## Usage

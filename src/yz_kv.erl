@@ -213,7 +213,9 @@ index(Obj, Reason, P) ->
                                            [BKey, Err, Trace]);
                                 _ ->
                                     %% BEGIN YZ_ERR_PATCH Code
-                                    store_solr_error(BKey, Err),
+                                    spawn(fun() ->
+                                        store_solr_error(BKey, Err)
+                                    end),
                                     %% END YZ_ERR_PATCH Code
                                     ?ERROR("failed to index object ~p with error ~p because ~p",
                                            [BKey, Err, Trace])
@@ -482,7 +484,18 @@ wait_for(Check={M,F,A}, Seconds) when Seconds > 0 ->
 
 %% @private
 %%
-%% @doc Create an index and bucket type to hold errors encountered in the index function
+%% @doc Create bucket type to hold errors encountered in index/3
+maybe_setup_error_bucket_type(undefined) ->
+    lager:info("YZ_ERR_PATCH: Creating error bucket type = ~p", [?YZ_ERROR_INDEX]),
+    riak_core_bucket_type:create(?YZ_ERROR_INDEX, [{allow_mult, false},{?YZ_INDEX, ?YZ_ERROR_INDEX}]),
+    riak_core_bucket_type:activate(?YZ_ERROR_INDEX);
+maybe_setup_error_bucket_type(_) ->
+    lager:info("YZ_ERR_PATCH: Creating error bucket type = ~p", [?YZ_ERROR_INDEX]),
+    riak_core_bucket_type:update(?YZ_ERROR_INDEX, [{allow_mult, false},{?YZ_INDEX, ?YZ_ERROR_INDEX}]).
+
+%% @private
+%%
+%% @doc Create an index to hold errors encountered in index/3
 maybe_setup_error_index(true) ->
     ok;
 maybe_setup_error_index(false) ->
@@ -490,15 +503,16 @@ maybe_setup_error_index(false) ->
 
     yz_index:create(?YZ_ERROR_INDEX, ?YZ_DEFAULT_SCHEMA_NAME),
 
-    wait_for({yz_solr, ping, [?YZ_ERROR_INDEX]}, 10),
+    wait_for({yz_solr, ping, [?YZ_ERROR_INDEX]}, 10).
 
-    case riak_core_bucket_type:get(?YZ_ERROR_INDEX) of
-        undefined ->
-            riak_core_bucket_type:create(?YZ_ERROR_INDEX, [{allow_mult, false},{?YZ_INDEX, ?YZ_ERROR_INDEX}]),
-            riak_core_bucket_type:activate(?YZ_ERROR_INDEX);
-        _ ->
-            riak_core_bucket_type:update(?YZ_ERROR_INDEX, [{allow_mult, false},{?YZ_INDEX, ?YZ_ERROR_INDEX}])
-    end.
+%% @private
+%%
+%% @doc Create an index and bucket type to hold errors encountered in index/3
+setup_error_bucket() ->
+    ok = maybe_setup_error_index(yz_index:exists(?YZ_ERROR_INDEX)),
+    Type = riak_core_bucket_type:get(?YZ_ERROR_INDEX),
+    ok = maybe_setup_error_bucket_type(Type),
+    ok.
 
 %% @private
 %%
@@ -512,8 +526,6 @@ store_solr_error({{?YZ_ERROR_INDEX,_},_}=BKey, Err) ->
 store_solr_error(BKey, Err) ->
     try
         %% Todo: make this behavior configurable
-        maybe_setup_error_index(yz_index:exists(?YZ_ERROR_INDEX)),
-
         lager:debug("YZ_ERR_PATCH: Error encountered in yz_kv:index, submitting to yz_err index, BKey = ~p, Err = ~p", [BKey, Err]),
 
         ErrStr = list_to_binary(lists:flatten(io_lib:format("~p",[Err]))),
