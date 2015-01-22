@@ -13,6 +13,14 @@ Copy the generated beams into the basho-patches directory. The basho-patches dir
 cp -R ebin/*.beam /usr/lib/riak/lib/basho-patches/
 ```
 
+## Compile on CentOS without erlang and Riak 2.0.4 installed
+
+```
+mkdir -p ebin
+erlc -pa src/ -I include/ -o ebin/ src/*.erl
+cp ebin/*.beam /usr/lib64/riak/lib/basho-patches/
+```
+
 ## Usage
 
 The following are the fields indexed by the yz_err index
