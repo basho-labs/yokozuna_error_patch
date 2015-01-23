@@ -137,7 +137,6 @@ wait_for(Check={M,F,A}, Seconds) when Seconds > 0 ->
         true ->
             ok;
         false ->
-            lager:debug("Waiting for ~p:~p(~p)...~n", [M, F, A]),
             timer:sleep(1000),
             wait_for(Check, Seconds - 1)
     end.
@@ -146,11 +145,9 @@ wait_for(Check={M,F,A}, Seconds) when Seconds > 0 ->
 %%
 %% @doc Create bucket type to hold errors encountered in index/3
 maybe_setup_error_bucket_type(undefined) ->
-    lager:info("YZ_ERR_PATCH: Creating error bucket type = ~p", [?YZ_ERROR_INDEX]),
     riak_core_bucket_type:create(?YZ_ERROR_INDEX, [{allow_mult, false},{?YZ_INDEX, ?YZ_ERROR_INDEX}]),
     riak_core_bucket_type:activate(?YZ_ERROR_INDEX);
 maybe_setup_error_bucket_type(_) ->
-    lager:info("YZ_ERR_PATCH: Creating error bucket type = ~p", [?YZ_ERROR_INDEX]),
     riak_core_bucket_type:update(?YZ_ERROR_INDEX, [{allow_mult, false},{?YZ_INDEX, ?YZ_ERROR_INDEX}]).
 
 %% @private
@@ -159,8 +156,5 @@ maybe_setup_error_bucket_type(_) ->
 maybe_setup_error_index(true) ->
     ok;
 maybe_setup_error_index(false) ->
-    lager:info("YZ_ERR_PATCH: Creating error index = ~p", [?YZ_ERROR_INDEX]),
-
     yz_index:create(?YZ_ERROR_INDEX, ?YZ_DEFAULT_SCHEMA_NAME),
-
     wait_for({yz_solr, ping, [?YZ_ERROR_INDEX]}, 10).
