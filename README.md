@@ -47,3 +47,21 @@ Following is an example record returned from the query `curl 'http://localhost:8
     "_yz_rt": "yz_err"
 }
 ```
+
+Initial Setup
+
+The `yz_err` bucket-type and index will be automatically created the first time an error occurs. To set it up manually in preparation for future errors, perform the following steps:
+
+Attach to a running patched riak instance
+
+```
+riak attach
+```
+
+Once in the erlang shell, run the following erlang snippet:
+
+```
+yz_errors:setup_error_bucket().
+```
+
+NOTE: Use "Ctrl-C a" to exit the shell. q() or init:stop() will terminate the riak node.
