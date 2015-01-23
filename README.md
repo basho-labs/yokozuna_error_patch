@@ -1,25 +1,38 @@
 # yokozuna_error_patch
 Yokozuna modifications to improve error handling and visibility.
 
-## Compile this project and patch Riak
+## Patch Riak
+
+Copy the generated beams into the basho-patches directory. The basho-patches directory for your platform can be found here: [http://docs.basho.com/riak/latest/ops/running/rolling-upgrades/#Basho-Patches](http://docs.basho.com/riak/latest/ops/running/rolling-upgrades/#Basho-Patches)
+
+```
+cp ebin/*.beam /usr/lib64/riak/lib/basho-patches/
+```
+
+### For testing, compilation of this project can be done with make
 
 ```
 make
 ```
 
-Copy the generated beams into the basho-patches directory. The basho-patches directory for your platform can be found here: [http://docs.basho.com/riak/latest/ops/running/rolling-upgrades/#Basho-Patches](http://docs.basho.com/riak/latest/ops/running/rolling-upgrades/#Basho-Patches)
+## Initial Setup
+
+The `yz_err` bucket-type and index will be automatically created the first time an error occurs. To set it up manually in preparation for future errors, perform the following steps:
+
+Attach to a running patched riak instance
 
 ```
-cp -R ebin/*.beam /usr/lib/riak/lib/basho-patches/
+riak attach
 ```
 
-## Compile on CentOS without erlang and Riak 2.0.4 installed
+Once in the erlang shell, run the following erlang snippet:
 
 ```
-mkdir -p ebin
-erlc -pa src/ -I include/ -o ebin/ src/*.erl
-cp ebin/*.beam /usr/lib64/riak/lib/basho-patches/
+yz_errors:setup_error_bucket().
 ```
+
+NOTE: Use "Ctrl-C a" to exit the shell. q() or init:stop() will terminate the riak node.
+
 
 ## Usage
 
@@ -47,21 +60,3 @@ Following is an example record returned from the query `curl 'http://localhost:8
     "_yz_rt": "yz_err"
 }
 ```
-
-## Initial Setup
-
-The `yz_err` bucket-type and index will be automatically created the first time an error occurs. To set it up manually in preparation for future errors, perform the following steps:
-
-Attach to a running patched riak instance
-
-```
-riak attach
-```
-
-Once in the erlang shell, run the following erlang snippet:
-
-```
-yz_errors:setup_error_bucket().
-```
-
-NOTE: Use "Ctrl-C a" to exit the shell. q() or init:stop() will terminate the riak node.
