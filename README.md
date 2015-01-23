@@ -48,7 +48,7 @@ Following is an example record returned from the query `curl 'http://localhost:8
 }
 ```
 
-Initial Setup
+## Initial Setup
 
 The `yz_err` bucket-type and index will be automatically created the first time an error occurs. To set it up manually in preparation for future errors, perform the following steps:
 
