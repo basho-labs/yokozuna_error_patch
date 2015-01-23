@@ -48,6 +48,8 @@ store_solr_error({{?YZ_ERROR_INDEX,_},_}=BKey, Err) ->
     lager:debug("YZ_ERR_PATCH: Error encountered in yz_kv:index, first submission to error index failed. Preventing recursion by exiting, BKey = ~p, Err = ~p", [BKey, Err]),
     ok;
 store_solr_error(BKey, Err) ->
+    %% we had to put this back on the put path because of a startup race condition
+    setup_error_bucket(),
     gen_server:cast(?MODULE, {store_error, BKey, Err}).
 
 %% @doc Create an index and bucket type to hold errors encountered in index/3

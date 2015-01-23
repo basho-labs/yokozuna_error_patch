@@ -1,6 +1,6 @@
 {application,yokozuna,
              [{description,"Integrating Apache Solr into Riak"},
-              {vsn,"89f2c45"},
+              {vsn,"2f35797"},
               {registered,[]},
               {applications,[kernel,stdlib,ibrowse,riak_core,riak_kv]},
               {env,[]},
