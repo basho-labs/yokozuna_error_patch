@@ -65,5 +65,6 @@ init([]) ->
 
     Children = [Events, HashtreeSup, EntropyMgr, Cover, Errors],
     %% END YZ_ERR_PATCH Code
+    %% Children = [Events, HashtreeSup, EntropyMgr, Cover],
 
     {ok, {{one_for_one, 5, 10}, Children}}.
