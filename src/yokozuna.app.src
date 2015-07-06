@@ -11,5 +11,6 @@
                   riak_core,
                   riak_kv
                  ]},
+  {mod, { yz_app, []}},
   {env, []}
  ]}.
